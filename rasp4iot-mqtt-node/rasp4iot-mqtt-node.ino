@@ -1,4 +1,3 @@
-
 /*
   Rasp4IoT Node
   
@@ -19,23 +18,26 @@
 #include<string.h>
 
 // ========== Macros e constantes ==========
-                                            // referentes ao sensor anemometro
 
-#define MBUFFER         256                  // BUFFER para as mensagens 
+#define MBUFFER         256                       // BUFFER para as mensagens 
 
-#define INTERFACE_NAP   "e5ac1a86-b375-419d-ac77-616d8ef274d7"
-#define NODE_NID        "J5Hd"
-#define NODE_GW         "hiNJ"
+#define INTERFACE_NAP   "16ef0b02-2849-45d5-8e8a-20c5ae3ca5dd"
+#define NODE_NID        "FakW"
+#define GW_ADDR         "bAS8"
+#define NODE_ADDR1      "R57o"
+#define NODE_ADDR2      "LgMm"
 
-#define WIFI_SSID       "R.port_acess"            // SSID da rede
-#define WIFI_PASSWD     "tplink123"               // senha da rede
+#define WIFI_SSID       "ssid"                    // SSID da rede
+#define WIFI_PASSWD     "password"                // senha da rede
 
                                                   // referentes ao MQTT-Broker
-#define MQTT_CLIENT     "RASP4IOT_MQTT_NODE"      // host como est. met. com esp32 ponta cliente
+#define MQTT_CLIENT     "RASP4IOT_MQTT_NODE"      // host cliente no MQTT
 #define MQTT_USER       ""                        // usuario para conectar na rede MQTT
 #define MQTT_PASSWD     ""                        // senha para conectar na rede MQTT
-#define MQTT_SERVER     "192.168.3.10"          // endereco IP do servidor MQTT
+#define MQTT_SERVER     "192.168.3.11"            // endereco IP do servidor MQTT
 #define MQTT_PORT       1883                      // porta do servidor MQTT
+#define MQTT_KEEPALIVE  60                        // tempo do keepalive em segundos
+#define MQTT_TIMEOUT    60                        // timeout de conexao em segundos
 
 #define MQTT_CMD_SEND       "send"
 #define MQTT_CMD_RECEIVE    "receive"
@@ -58,7 +60,7 @@ enum NodeAddr{GATEWAY,NODE1,NODE2};                                   // enumera
 // ========== constantes ===================
 const char NAP[] = INTERFACE_NAP;
 const char NID[] = NODE_NID;
-const char NODE[][5]= {"hiNJ","POw2"};
+const char NODE[][5]= {GW_ADDR, NODE_ADDR1, NODE_ADDR2};
 const char MQTT_SEND[] = MQTT_CMD_SEND;
 const char MQTT_RECEIVE[] = MQTT_CMD_RECEIVE;
 
@@ -87,25 +89,24 @@ PubSubClient client(MQTT_SERVER, MQTT_PORT, callback, espWFClient);   // callbac
 void setup() {
   
   Serial.begin(9600);
-  wifiConnect();                                                    // chama a funcao que conecta ESP32 na rede Wi-Fi
-  mqttSetup();                                                      // chama a funcao que config. ESP32 na rede MQTT
+  wifiConnect();                                                    // chama a funcao que conecta ESP na rede Wi-Fi
+  mqttSetup();                                                      // chama a funcao que config. ESP na rede MQTT
+  mqttConnect();                                                    // chama a funcao que conecta ESP na rede MQTT e verifica se mantem conectado
 }
 
 // ========== Codigo principal ==============
 void loop() {
-
-  mqttConnect();                                                    // chama a funcao que conecta ESP32 na rede MQTT e verifica se mantem conectado
-  
+ 
   if(millis() - runtime > 30000){
-    
+    mqttConnect();                                                    // chama a funcao que conecta ESP na rede MQTT e verifica se mantem conectado
     runtime = millis();
     snprintf(message, MBUFFER, "%d", random(100));
     
     mqttPublish(mqttTopicSend[GATEWAY], message);
     mqttPublish(mqttTopicSend[NODE1], message);
+    mqttPublish(mqttTopicSend[NODE2], message);
   }
   //Serial.println(message);
-  client.loop();
 }
 
 // ========== Rotinas de interrupcao ========
@@ -116,13 +117,13 @@ u_int8 wifiConnect(){
   static u_int8  wifiStatus = 0, statusChange = 0;                                  // status da conexao
   static u_int32 runtime = millis();                                                // tempo atual para controlar envio do log
     
-  wifiStatus = ((WiFi.status() != WL_CONNECTED) ?  0 : 1);                           // se nao conectado, wifiStatus = 0
+  wifiStatus = ((WiFi.status() != WL_CONNECTED) ?  0 : 1);                          // se nao conectado, wifiStatus = 0
   
   if(!wifiStatus){
 
     WiFi.begin(WIFI_SSID, WIFI_PASSWD);                                             // passando o usuario e senha de rede wi-fi
     
-    if(!wifiStatus && (millis() - runtime > 1000)){                                     // mostra status da conexao a cada 1s
+    if(!wifiStatus && (millis() - runtime > 1000)){                                 // mostra status da conexao a cada 1s
     
         Serial.println("[WiFi] Status: falha na conexao - nova tentativa...");
         runtime = millis();                                                         // atualiza temporizador
@@ -137,15 +138,19 @@ u_int8 wifiConnect(){
     delay(1500);
   }    
   return wifiStatus;                                                                // retorna status da conexao        
-}                                                           // configuracao do MQTT
-                                                                         
-void mqttSetup(){                                               
-    client.setServer(MQTT_SERVER, MQTT_PORT);                             // definindo servidor e porta
-    client.setCallback(callback);                                         // definindo a funcao que trata os dados recebidos da rede   
 }
-                                                                          // funcao para conectar o MQTT
+
+                                                                                    // configuracao do MQTT                                                                         
+void mqttSetup(){                                               
+    client.setServer(MQTT_SERVER, MQTT_PORT);                                       // definindo servidor e porta
+    client.setCallback(callback);                                                   // definindo a funcao que trata os dados recebidos da rede   
+    client.setKeepAlive(MQTT_KEEPALIVE);                                            // definindo tempo do keepalive
+    client.setKeepAlive(MQTT_TIMEOUT);                                              // definindo tempo do timeout
+    
+}
+                                                                                    // funcao para conectar o MQTT
 void mqttConnect() {
-  if(!client.connected()){                                                // testa conexao do MQTT
+  if(!client.connected()){                                                          // testa conexao do MQTT
     do {                                 
       Serial.print("Attempting MQTT connection... ");
       Serial.println(client.state());
@@ -153,12 +158,12 @@ void mqttConnect() {
       
       //client.setKeepAlive(0);
       //client.setSocketTimeout(0);
-      //if (client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWD)) {        // autenticao MQTT
+      //if (client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWD)) {                  // autenticao MQTT
       
-      if (client.connect(MQTT_CLIENT)) {        // autenticao MQTT
+      if (client.connect(MQTT_CLIENT)) {                                            // autenticao MQTT
         Serial.println("connected");
         mqttBuildTopics();        
-      } else {                                                          // caso contrario indica erro e tenta novamente
+      } else {                                                                      // caso contrario indica erro e tenta novamente
         Serial.print("failed, rc=");
         Serial.print(client.state());
         Serial.println(" try again in 5 seconds");
@@ -168,7 +173,7 @@ void mqttConnect() {
     } while (!client.connected());
   }
   else{
-    client.loop();                                                        // usada para continuar comunicacao com o servidor
+    client.loop();                                                                  // usada para continuar comunicacao com o servidor
   }  
 }
 
@@ -195,15 +200,15 @@ void callback(char* topic, byte* message, unsigned int length) {
 
   char    *breakStr,
           payload[length+1],
-          newStr[9][MBUFFER] = {" ", " ", " ", " ", " "};                          // matriz de strings
+          newStr[9][MBUFFER] = {" ", " ", " ", " ", " "};                           // matriz de strings
   u_int8  i = 0;                                                                    // var. aux. de indices
 
-  breakStr = strtok(topic, "/");                                   // atribuindo ao conteudo a mensagem separada pelo primeiro delimitador
-  while(breakStr != NULL){                                               // enquanto ponteiro nao apontar NULL - vazio
+  breakStr = strtok(topic, "/");                                                    // atribuindo ao conteudo a mensagem separada pelo primeiro delimitador
+  while(breakStr != NULL){                                                          // enquanto ponteiro nao apontar NULL - vazio
       //Serial.println(breakStr);
-      strcpy(newStr[i], breakStr);                                      // copiando string delimitada atual na posicao i
-      breakStr = strtok(NULL, "/");                                // quebra mensagem incrementa ponteiro                                
-      i++;                                                                // incrementando indice para acompanhar indices
+      strcpy(newStr[i], breakStr);                                                  // copiando string delimitada atual na posicao i
+      breakStr = strtok(NULL, "/");                                                 // quebra mensagem incrementa ponteiro                                
+      i++;                                                                          // incrementando indice para acompanhar indices
   }
 
   if(!strcmp(newStr[0], NAP)){
