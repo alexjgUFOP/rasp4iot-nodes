@@ -14,22 +14,22 @@
 
 // ========== INCLUSAO DAS BIBLIOTECAS ========
 
-#include<SPI.h>                         // lib. para barramento SPI
-#include<LoRa.h>                      // lib. para conexao LoRa
+#include<SPI.h>                             // lib. para barramento SPI
+#include<LoRa.h>                            // lib. para conexao LoRa
 #include<string.h>
 
 // ========== Macros e constantes ==========
-                                            // referentes ao sensor anemometro
 
 #define MBUFFER         50                  // BUFFER para as mensagens 
 
-#define NODE_NID        "yKNA"
+#define NODE_NID        "R57o"
 #define NODE_GW         "YyeM"
-#define NODE_ADDR1      "6123"
+#define NODE_ADDR1      "LgMm"
+#define NODE_ADDR2      "FakW"
 
 #define LORA_GAIN       20                  // potencia do sinal em dBm
 #define LORA_FREQ_TX    915E6               // canal de op. em MHz
-#define LORA_FREQ_RX    868E6               // canal de op. em MHz
+#define LORA_FREQ_RX    918E6               // canal de op. em MHz
 
 // ========== Mapeamento de portas =========
 
@@ -37,9 +37,6 @@
 #define SPI_SCK     14
 #define SPI_MISO    12
 #define SPI_MOSI    13
-
-#define I2C_SDC      5
-#define I2C_SDA      4
 
 #define LORA_SS     15
 #define LORA_RST     2
@@ -57,9 +54,9 @@ typedef unsigned long u_int32;                                                  
 // ========== estruturas ===================
 enum NodeAddr{GATEWAY,NODE1,NODE2};                                                                     // enumeracao de enderecos
 
-// ========== constantes ===================;
+// ========== constantes ===================
 const char NID[] = NODE_NID;
-const char NODE[][5]= {NODE_GW, NODE_ADDR1};
+const char NODE[][5]= {NODE_GW, NODE_ADDR1, NODE_ADDR2};
 
 // ========== Variaveis globais ============
 u_int32     runtime = 0;
@@ -99,6 +96,7 @@ void loop() {
     // gateway destiny  | node - gw - gw
     loraSend(NID, NODE[GATEWAY], NODE[GATEWAY], message);
     loraSend(NID, NODE[GATEWAY], NODE[NODE1], message);
+    loraSend(NID, NODE[GATEWAY], NODE[NODE2], message);
   }                      
 }
 
@@ -202,6 +200,7 @@ void loraSend(const char *nid_origin, const char *gateway, const char *nid_desti
         LoRa.print(mesg);                                                                               // corpo da mensagem
         LoRa.endPacket();                                                                               // finalizando envio de pacote LORA
         Serial.printf("[LoRa] Status: mensagem enviada: \n\tADDR: \"%s\" \n\tDATA: \"%s\"\n", networkAddress,mesg);
+        delay(10);
     }
     else{
         Serial.println("[LoRa] Status: Erro no envio");
