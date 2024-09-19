@@ -23,13 +23,15 @@
 #define MBUFFER           256                     // BUFFER para as mensagens 
 
 #define INTERFACE_NAP     "b36f57ad-0345-4643-be9f-9d4395d4e91c"
-#define NODE_NID          "6dvq"
+#define NODE_NID          "LgMm"
 #define NODE_GW           "wOyo"
-#define NODE_ADDR1        "6123"
-#define WIFI_SSID         "R.port_acess"          // SSID da rede
-#define WIFI_PASSWD       "tplink123"             // senha da rede
+#define NODE_ADDR1        "R57o"
+#define NODE_ADDR2        "FakW"
 
-#define HTTP_SERVER       "http://192.168.3.10"
+#define WIFI_SSID         "ssid"                  // SSID da rede
+#define WIFI_PASSWD       "password"              // senha da rede
+
+#define HTTP_SERVER       "http://192.168.3.11"
 #define HTTP_PORT         3000
 #define HTTP_CMD_SEND     "/devices/send"
 #define HTTP_CMD_RECEIVE  "/devices/receive/http"
@@ -54,12 +56,12 @@ const char HTTP_SEND[] = HTTP_CMD_SEND;
 const char HTTP_RECEIVE[] = HTTP_CMD_RECEIVE;
 const char NAP[] = INTERFACE_NAP;
 const char NID[] = NODE_NID;
-const char NODE[][5]= {NODE_GW, NODE_ADDR1};
+const char NODE[][5]= {NODE_GW, NODE_ADDR1, NODE_ADDR2};
 const int PORT = HTTP_PORT;
 const char SERVER[] = HTTP_SERVER;
 
 // ========== Variaveis globais =============
-u_int32     runtime = 0;
+u_int32     runtime = 0, timecheck = 0;
 char        message[MBUFFER];
 
 // ========== Prototipos das Funcoes ========
@@ -89,9 +91,15 @@ void loop() {
     runtime = millis();
     
     snprintf(message, MBUFFER, "%d", random(100));
-    
+    httpReceive(espWFClient, NAP, NID);
     httpSend(espWFClient, NAP, NID, NODE[GATEWAY], message);
     httpSend(espWFClient, NAP, NID, NODE[NODE1], message);
+    httpSend(espWFClient, NAP, NID, NODE[NODE2], message);
+  }
+
+  if(millis() - timecheck > 5000){
+
+    timecheck = millis();
     httpReceive(espWFClient, NAP, NID);
   }
 
@@ -153,7 +161,9 @@ void httpGet(WiFiClient wifi, char *httpPath){
     
     HTTPClient http;
     String payload;
+    char packet[3][MBUFFER] = {"", "", ""};
     u_int16 httpCode;
+
       
     http.begin(wifi, httpPath);
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -164,9 +174,11 @@ void httpGet(WiFiClient wifi, char *httpPath){
       payload = http.getString();
       if(payload != "" && payload != NULL){
         Serial.printf("[HTTP] Status: requisição GET enviada com código %d\n", httpCode);
-        payload = http.getString();
+        payload = (String) http.getString();
         Serial.printf("\tHTTP_PATH: %s\n", httpPath);
-        Serial.printf("\tMENSAGEM: %s\n\n", payload);
+        Serial.print("\tMENSAGEM: ");
+        Serial.println(payload);
+        Serial.println();
       }
     }
     else{
